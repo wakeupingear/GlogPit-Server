@@ -163,7 +163,7 @@ server.on("connection", function (socket)//player connects
                     buf.writeInt16LE(_y, 4);
                     buf.writeUInt8(_spriteIndex, 6);
                     buf.writeUInt8(_imageIndex, 7);
-                    buf.writeInt8(_imageXs, 9);
+                    buf.writeInt8(_imageXs, 8);
                     buf.writeUInt8(_state, 9);
                     buf.writeUInt8(_attack, 10);
                     //buf.writeUInt8(_kJump, 8);
