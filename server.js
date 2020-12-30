@@ -19,7 +19,6 @@ const states = Object.freeze(
 
 //npm
 const net = require("net");
-const http = require("http");
 const buf = Buffer.alloc(512);
 
 var port = 34579;
