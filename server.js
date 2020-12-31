@@ -15,11 +15,12 @@ const states = Object.freeze(
         "offering": 1,
         "playing": 2,
         "spectating": 3,
+        "rematchOffering": 4
     });
 
 //npm
 const net = require("net");
-const buf = Buffer.alloc(512);
+const buf = Buffer.alloc(1024);
 
 var port = 34579;
 var server = net.createServer();
@@ -48,12 +49,22 @@ server.on("connection", function (socket)//player connects
 
     buf.fill(0); //reset buffer
     buf.writeUInt8(network.player_connect, 0); //write "connect" command
-    buf.writeUInt8(ids, 1); //write "connect" command
+    buf.writeUInt8(ids, 1);
+    var _playerData = "";
+    for (var i = 0; i < socketList.length; i++) {
+        var _socketData = socketToPlayer[socketList[i].id];
+        _playerData += _socketData.cid + "?" + _socketData.state + "?" + _socketData.name + "!";
+    }
+    console.log(_playerData);
+    // _playerData="1?0?Joe!2?0?Mama!"
+    buf.write(_playerData, 2);
     socket.write(buf); //send buffer to player    
 
-    for (var i = 0; i < socketList.length; i++) { //send existing players
-        sendPlayerObject(socketToPlayer[socketList[i].id], socket)
-    }
+    /*for (var i = 0; i < socketList.length; i++) { //send existing players
+        //setTimeout(function(i){
+            sendPlayerObject(socketToPlayer[socketList[i].id], socket);
+        //},(i+1)*800);
+    }*/
 
     socketList.push(socket);
     ids = (ids + 1) % 256;
@@ -64,7 +75,7 @@ server.on("connection", function (socket)//player connects
                 console.log("Recieved '0'");
                 break;
             case network.player_connect:
-                var playerName = data.toString("utf-8", 1);
+                var playerName = data.toString("utf-8", 1).replace(/\0/g, '').replace("\u0005", "");
                 socketToPlayer[socket.id].name = playerName;
 
                 for (var i = 0; i < socketList.length; i++) {
@@ -77,11 +88,13 @@ server.on("connection", function (socket)//player connects
             case network.state:
                 var _state = data.readInt8(1);
                 switch (_state) {
+                    case states.rematchOffering:
                     case states.offering:
                         var _otherPlayer = data.readInt8(2);
                         var _playerInd = -1;
+                        console.log(socket.id + " offering to " + _otherPlayer);
                         for (var i = 0; i < socketList.length; i++) {
-                            if (socketList[i].id == _otherPlayer && socketToPlayer[_otherPlayer].state != states.playing) {
+                            if (socketList[i].id == _otherPlayer && (socketToPlayer[_otherPlayer].state != states.playing || _state == states.rematchOffering)) {
                                 _playerInd = i;
                                 break
                             }
@@ -100,27 +113,41 @@ server.on("connection", function (socket)//player connects
                 break;
             case network.game_start:
                 var _players = [];
-                _players[0] = data.readUInt8(1);
-                _players[1] = socket.id;
-                socketToPlayer[_players[0]].state = states.playing;
-                socketToPlayer[_players[0]].game = _players[0] + ":" + _players[1];
-                socketToPlayer[_players[1]].state = states.playing;
-                socketToPlayer[_players[1]].game = _players[0] + ":" + _players[1];
-                console.log("Game starting: " + _players[0] + ":" + _players[1]);
-                games[_players[0] + ":" + _players[1]] =
+                var _whichPlayer = 0;
+                if (data.readUInt8(4) == true) var _whichPlayer = 1;
+                _players[1 - _whichPlayer] = data.readUInt8(1);
+                _players[_whichPlayer] = socket.id;
+                var _p1Score = data.readUInt8(2);
+                var _p2Score = data.readUInt8(3);
+                console.log(_players)
+                socketToPlayer[_players[1 - _whichPlayer]].state = states.playing;
+                socketToPlayer[_players[1 - _whichPlayer]].game = _players[1 - _whichPlayer] + ":" + _players[_whichPlayer];
+                socketToPlayer[_players[_whichPlayer]].state = states.playing;
+                socketToPlayer[_players[_whichPlayer]].game = _players[1 - _whichPlayer] + ":" + _players[_whichPlayer];
+
+                //remove old games
+                if ((_players[1 - _whichPlayer] + ":" + _players[_whichPlayer] in games)) delete games[_players[1 - _whichPlayer] + ":" + _players[_whichPlayer]];
+                if ((_players[_whichPlayer] + ":" + _players[1 - _whichPlayer] in games)) delete games[_players[_whichPlayer] + ":" + _players[1 - _whichPlayer]];
+
+                games[_players[1 - _whichPlayer] + ":" + _players[_whichPlayer]] = //set up new game
                 {
                     "p1": _players[0],
                     "p2": _players[1],
-                    "spectators": []
+                    "spectators": [],
+                    "p1Score": _p1Score,
+                    "p2Score": _p2Score,
                 };
+                console.log(games);
+
+                console.log("Game starting: " + _players[0] + "(" + games[_players[1 - _whichPlayer] + ":" + _players[_whichPlayer]].p1Score + "):" + _players[1] + "(" + games[_players[1 - _whichPlayer] + ":" + _players[_whichPlayer]].p2Score + ")");
 
                 for (var i = 0; i < socketList.length; i++) {
-                    if (socketList[i].id != _players[0] && socketList[i].id != _players[1]) {
+                    if (socketList[i].id != _players[1 - _whichPlayer] && socketList[i].id != _players[_whichPlayer]) {
                         buf.fill(0);
                         buf.writeUInt8(network.state, 0);
                         buf.writeUInt8(states.playing, 1);
-                        buf.writeUInt8(_players[0], 2);
-                        buf.writeUInt8(_players[1], 3);
+                        buf.writeUInt8(_players[1 - _whichPlayer], 2);
+                        buf.writeUInt8(_players[_whichPlayer], 3);
                         socketList[i].write(buf);
                     }
                 }
@@ -129,11 +156,13 @@ server.on("connection", function (socket)//player connects
                     buf.writeUInt8(network.game_start, 0);
                     buf.writeUInt8(_players[1 - i], 1);
                     buf.writeUInt8(i, 2);
+                    buf.writeUInt8(_p1Score, 3);
+                    buf.writeUInt8(_p2Score, 4);
                     socketList[socketToPlayer[_players[i]].socketPos].write(buf);
                 }
 
                 break;
-                
+
             case network.move:
                 var _x = data.readInt16LE(1);
                 var _y = data.readInt16LE(3);
