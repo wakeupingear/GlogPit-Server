@@ -166,6 +166,7 @@ server.on("connection", function (socket)//player connects
             case network.game_spectate:
                 var _cid = data.readUInt8(1);
                 socketToPlayer[socket.id].state = states.spectating;
+                console.log(socketToPlayer[_cid])
                 socketToPlayer[_cid].game.spectators.push(socket.id);
                 var _game=socketToPlayer[_cid].game;
                 buf.fill(0);
