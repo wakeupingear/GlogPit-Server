@@ -48,11 +48,11 @@ server.on("connection", function (socket)//player connects
                 break;
 
             case network.player_connect: //player confirms connection
-                let _struct = readBufString(data, 1); //recieve player struct
-                socketToPlayer[socket.id] = _struct;
+                let _structConnect = readBufString(data, 1); //recieve player struct
+                socketToPlayer[socket.id] = _structConnect;
 
                 updateState(socket); //send struct to other clients
-                console.log("PlayerName: " + _struct.name);
+                console.log("PlayerName: " + _structConnect.name);
                 break;
 
             case network.move:
@@ -138,7 +138,6 @@ server.on("connection", function (socket)//player connects
                                 buf.writeUInt8(games[game].p2Score, 4);
 
                                 //add code to send this spectator to the players
-                                break;
                             }
                         });
                         break;
@@ -147,11 +146,9 @@ server.on("connection", function (socket)//player connects
                             if (game.indexOf("'" + socket.id + "'") > -1) { //remove game if you were playing in one
                                 delete games[game]; 
                                 //add code to close game for spectators/other player
-                                break;
                             }
                             else if (game.spectators.includes(socket.id)) { //remove from spectator list
                                 game.spectators.splice(game.spectators.indexOf(socket.id), 1);
-                                break;
                             }
                         });
                         break;
