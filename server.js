@@ -6,8 +6,6 @@ const network = Object.freeze(
         "player_disconnect": 3,
         "state": 4,
         "move": 5,
-        "game_start": 6,
-        "game_spectate": 7
     });
 
 const states = Object.freeze(
@@ -21,197 +19,59 @@ const states = Object.freeze(
 
 //npm
 const net = require("net");
-const buf = Buffer.alloc(1024);
+const buf = Buffer.alloc(4096);
 
-var port = 34579;
-var server = net.createServer();
-var ids = 0;
+let port = 34579;
+let server = net.createServer();
+let ids = 0;
 
-var socketToPlayer = new Map();
-var socketList = [];
-var games = {};
+let socketToPlayer = {};
+let socketToID = {};
+let games = {};
 
 server.on("connection", function (socket)//player connects
 {
     console.log("New player");
-    socket.id = ids;
-    var _len = socketList.length;
-    socketToPlayer[ids] = {
-        "cid": ids,
-        "hpState": 0,
-        "cx": 0,
-        "cy": 0,
-        "state": 0,
-        "name": 0,
-        //server stuff
-        "socketPos": _len,
-        "game": -1
-    }
-
-    buf.fill(0); //reset buffer
-    buf.writeUInt8(network.player_connect, 0); //write "connect" command
+    socket.id = ids; //set this player's id
+    socketToID[socket.id] = socket; //add an entry mapping id to socket (bad name I know)
+    buf.fill(0)
+    buf.writeUInt8(network.player_connect, 0); //send a connect packet with this id
     buf.writeUInt8(ids, 1);
-    var _playerData = "";
-    for (var i = 0; i < socketList.length; i++) {
-        var _socketData = socketToPlayer[socketList[i].id];
-        _playerData += _socketData.cid + "?" + _socketData.state + "?" + _socketData.name + "!";
-    }
-    console.log(_playerData);
-    // _playerData="1?0?Joe!2?0?Mama!"
-    buf.write(_playerData, 2);
-    socket.write(buf); //send buffer to player    
-
-    /*for (var i = 0; i < socketList.length; i++) { //send existing players
-        //setTimeout(function(i){
-            sendPlayerObject(socketToPlayer[socketList[i].id], socket);
-        //},(i+1)*800);
-    }*/
-
-    socketList.push(socket);
-    ids = (ids + 1) % 256;
+    socket.write(buf);
+    ids = (ids + 1) % 256; //iterate ids (1 byte constraint)
 
     socket.on("data", function (data) { //recieving data
         switch (data.readUInt8(0)) {
-            case network.send0:
+            case network.send0: //debug
                 console.log("Recieved '0'");
                 break;
-            case network.player_connect:
-                var playerName = data.toString("utf-8", 1).replace(/\0/g, '').replace("\u0005", "");
-                socketToPlayer[socket.id].name = playerName;
 
-                for (var i = 0; i < socketList.length; i++) {
-                    if (socketList[i].id != socket.id) {
-                        sendPlayerObject(socketToPlayer[socket.id], socketList[i]);
-                    }
-                }
-                console.log("PlayerName: " + playerName);
-                break;
-            case network.state:
-                var _state = data.readInt8(1);
-                switch (_state) {
-                    case states.rematchOffering:
-                    case states.offering:
-                        var _otherPlayer = data.readInt8(2);
-                        var _playerInd = -1;
-                        console.log(socket.id + " offering to " + _otherPlayer);
-                        for (var i = 0; i < socketList.length; i++) {
-                            if (socketList[i].id == _otherPlayer && (socketToPlayer[_otherPlayer].state != states.playing || _state == states.rematchOffering)) {
-                                _playerInd = i;
-                                break
-                            }
-                        }
-                        if (_playerInd == -1) break;
+            case network.player_connect: //player confirms connection
+                let _struct = readBufString(data, 1); //recieve player struckt
+                socketToPlayer[socket.id] = _struct;
 
-                        buf.fill(0);
-                        buf.writeUInt8(network.state, 0);
-                        buf.writeUInt8(states.offering, 1);
-                        buf.writeUInt8(socket.id, 2);
-                        socketList[_playerInd].write(buf);
-
-                        break;
-                    default: break;
-                }
-                break;
-            case network.game_start:
-                var _players = [];
-                var _whichPlayer = 0;
-                if (data.readUInt8(4) == true) var _whichPlayer = 1;
-                _players[1 - _whichPlayer] = data.readUInt8(1);
-                _players[_whichPlayer] = socket.id;
-                var _p1Score = data.readUInt8(2);
-                var _p2Score = data.readUInt8(3);
-                console.log(_players)
-                socketToPlayer[_players[1 - _whichPlayer]].state = states.playing;
-                socketToPlayer[_players[1 - _whichPlayer]].game = _players[1 - _whichPlayer] + ":" + _players[_whichPlayer];
-                socketToPlayer[_players[_whichPlayer]].state = states.playing;
-                socketToPlayer[_players[_whichPlayer]].game = _players[1 - _whichPlayer] + ":" + _players[_whichPlayer];
-
-                //remove old games
-                if ((_players[1 - _whichPlayer] + ":" + _players[_whichPlayer] in games)) delete games[_players[1 - _whichPlayer] + ":" + _players[_whichPlayer]];
-                if ((_players[_whichPlayer] + ":" + _players[1 - _whichPlayer] in games)) delete games[_players[_whichPlayer] + ":" + _players[1 - _whichPlayer]];
-
-                games[_players[1 - _whichPlayer] + ":" + _players[_whichPlayer]] = //set up new game
-                {
-                    "p1": _players[0],
-                    "p2": _players[1],
-                    "spectators": [],
-                    "p1Score": _p1Score,
-                    "p2Score": _p2Score,
-                };
-                console.log(games);
-
-                console.log("Game starting: " + _players[0] + "(" + games[_players[1 - _whichPlayer] + ":" + _players[_whichPlayer]].p1Score + "):" + _players[1] + "(" + games[_players[1 - _whichPlayer] + ":" + _players[_whichPlayer]].p2Score + ")");
-
-                for (var i = 0; i < socketList.length; i++) {
-                    if (socketList[i].id != _players[1 - _whichPlayer] && socketList[i].id != _players[_whichPlayer]) {
-                        buf.fill(0);
-                        buf.writeUInt8(network.state, 0);
-                        buf.writeUInt8(states.playing, 1);
-                        buf.writeUInt8(_players[1 - _whichPlayer], 2);
-                        buf.writeUInt8(_players[_whichPlayer], 3);
-                        socketList[i].write(buf);
-                    }
-                }
-                for (var i = 0; i < 2; i++) {
-                    buf.fill(0);
-                    buf.writeUInt8(network.game_start, 0);
-                    buf.writeUInt8(_players[1 - i], 1);
-                    buf.writeUInt8(i, 2);
-                    buf.writeUInt8(_p1Score, 3);
-                    buf.writeUInt8(_p2Score, 4);
-                    socketList[socketToPlayer[_players[i]].socketPos].write(buf);
-                }
-
-                break;
-            case network.game_spectate:
-                var _cid = data.readUInt8(1);
-                socketToPlayer[socket.id].state = states.spectating;
-                console.log(socketToPlayer[_cid])
-                socketToPlayer[_cid].game.spectators.push(socket.id);
-                var _game=socketToPlayer[_cid].game;
-                buf.fill(0);
-                buf.writeUInt8(network.game_spectating, 0);
-                buf.writeUInt8(_game.p1, 1);
-                buf.writeUInt8(_game.p2, 2);
-                buf.writeUInt8(_game.p1Score, 3);
-                buf.writeUInt8(_game.p2Score, 4);
-                socket.write(buf);
-
-                for (var i = 0; i < socketList.length; i++) {
-                    if (socketList[i].id != _players[1 - _whichPlayer] && socketList[i].id != _players[_whichPlayer]) {
-                        buf.fill(0);
-                        buf.writeUInt8(network.state, 0);
-                        buf.writeUInt8(states.spectating, 1);
-                        socketList[i].write(buf);
-                    }
-                }
+                updateState(socket); //send struct to other clients
+                console.log("PlayerName: " + _struct.name);
                 break;
 
             case network.move:
-                var _x = data.readInt16LE(1);
-                var _y = data.readInt16LE(3);
-                var _spriteIndex = data.readUInt8(5);
-                var _imageIndex = data.readUInt8(6);
-                var _imageXs = data.readInt8(7);
-                var _state = data.readUInt8(8);
-                var _attack = data.readUInt8(9);
-                //var _kJump = data.readUInt8(7);
-                //var _kAttack = data.readUInt8(8);
-                //var _kAttackDone = data.readUInt8(9);
-                //var _state = data.readUInt8(10);
-                socketToPlayer[socket.id].cx = _x;
-                socketToPlayer[socket.id].cy = _y;
-                socketToPlayer[socket.id].hpState = _state;
+                let _x = data.readInt16LE(1); //get data
+                let _y = data.readInt16LE(3);
+                let _spriteIndex = data.readUInt8(5);
+                let _imageIndex = data.readUInt8(6);
+                let _imageXs = data.readInt8(7);
+                let _state = data.readUInt8(8);
+                let _attack = data.readUInt8(9);
 
-                var _struct = games[socketToPlayer[socket.id].game]; //get game struct
-                var _players = _struct.spectators;
-                var _playerNum = (socket.id == _struct.p2);
+                let _struct = games[socketToPlayer[socket.id].game]; //get game struct
+                let _players = _struct.spectators; //get spectators
+                let _playerNum = (socket.id == _struct.p2); //figure out which player this one isn't
                 if (_playerNum) _players.push(_struct.p1);
                 else _players.push(_struct.p2);
-                for (var i = 0; i < _players.length; i++) {
+                for (let i = 0; i < _players.length; i++) { //loop through spectators and players to send movement
                     buf.fill(0);
                     buf.writeUInt8(network.move, 0);
-                    buf.writeUInt8(_playerNum, 1);
+                    buf.writeUInt8(_playerNum, 1); //player 1 or 2
                     buf.writeInt16LE(_x, 2);
                     buf.writeInt16LE(_y, 4);
                     buf.writeUInt8(_spriteIndex, 6);
@@ -219,53 +79,126 @@ server.on("connection", function (socket)//player connects
                     buf.writeInt8(_imageXs, 8);
                     buf.writeUInt8(_state, 9);
                     buf.writeUInt8(_attack, 10);
-                    //buf.writeUInt8(_kJump, 8);
-                    //buf.writeUInt8(_kAttack, 9);
-                    //buf.writeUInt8(_kAttackDone, 10);
-                    //buf.writeUInt8(_state, 11);
-                    socketList[socketToPlayer[_players[i]].socketPos].write(buf);
+                    socketToID[_players[i]].write(buf);
                 }
-                break
+                break;
+
+            case network.state: //updated state
+                const oldStruct = socketToPlayer[socket.id]; //save copy of previous struct
+                let newStruct = JSON.parse(readBufString(data.read(1))); //read new struct
+                switch (newStruct.clientState) {
+                    case states.offering: //game offers
+                    case states.rematchOffering:
+                        const other = socketToPlayer[newStruct.clicked]; //get the one that you are offering to
+                        if (other.clientState == newStruct.clientState && other.clicked == socket.id) { //both are offering to each other
+                            const gameTitle = getGameTitle(socket.id, newStruct.clicked); //calculate title of game
+                            console.log("Game starting: " + gameTitle);
+                            if (games[gameTitle] == undefined) { //brand new game
+                                games[gameTitle] = {
+                                    "p1": newStruct.clicked,
+                                    "p2": socket.id,
+                                    "p1Score": 0,
+                                    "p2Score": 0,
+                                    "spectators": []
+                                }
+                            }
+                            else { //game already exists
+                                if (oldStruct.wins < newStruct.wins) { //this player won the last game
+                                    if (games[gameTitle].p1 == socket.id) games[gameTitle].p1Score++;
+                                    else games[gameTitle].p2Score++;
+                                }
+                                else { //the other player won the last game
+                                    if (games[gameTitle].p1 == newStruct.clicked) games[gameTitle].p1Score++;
+                                    else games[gameTitle].p2Score++;
+                                }
+                            }
+                            const _players = [games[gameTitle].p1, games[gameTitle].p2].concat(games[gameTitle].spectators); //combine spectators and players
+                            for (let i = 0; i < _players.length; i++) { //send game_start to everyone involved
+                                buf.fill(0);
+                                buf.writeUInt8(network.game_start, 0);
+                                buf.writeUInt8(_players[1 - i], 1);
+                                buf.writeUInt8(i, 2);
+                                buf.writeUInt8(games[gameTitle].p1Score, 3);
+                                buf.writeUInt8(games[gameTitle].p2Score, 4);
+                                socketToID[_players[i]].write(buf);
+                            }
+                        }
+                        break;
+                    case states.spectating: //watch a game
+                        Object.entries(games).forEach(game => {
+                            if (game.indexOf("'" + newStruct.clicked + "'") > -1) { //determine the right game
+                                games[game].spectators.push(socket.id);
+                                buf.fill(0);
+                                buf.writeUInt8(network.game_start, 0); //send game_start to this player
+                                buf.writeUInt8(2, 1); //
+                                buf.writeUInt8(1 + spectators.length, 2); //position in spectator queue
+                                buf.writeUInt8(games[game].p1Score, 3);
+                                buf.writeUInt8(games[game].p2Score, 4);
+
+                                //add code to send this spectator to the players
+                                break;
+                            }
+                        });
+                        break;
+                    case states.idle: //return to game select screen
+                        Object.entries(games).forEach(game => {
+                            if (game.indexOf("'" + socket.id + "'") > -1) { //remove game if you were playing in one
+                                delete games[game]; 
+                                //add code to close game for spectators/other player
+                                break;
+                            }
+                            else if (game.spectators.includes(socket.id)) { //remove from spectator list
+                                game.spectators.splice(game.spectators.indexOf(socket.id), 1);
+                                break;
+                            }
+                        });
+                        break;
+                    default: break;
+                }
+                socketToPlayer[socket.id] = newStruct; //set the struct to the new one
+                updateState(socket); //send updated struct to other players
+                break;
+
             default: break;
         }
     });
 
     socket.on("error", function (data) { //disconnect
-        var _ind = socketList.indexOf(socket);
-        if (_ind > -1) delete socketList[_ind] //remove from socketList
-        socketList = removeEmpty(socketList);
+        delete socketToPlayer[socket.id];
+        delete socketToID[socket.id];
 
-        var _cid = socketToPlayer[socket.id].cid;
-        for (var i = 0; i < socketList.length; i++) //send disconnect to other players
-        {
+        socektToID.forEach(sock => { //send disconnect to other players
             buf.fill(0);
             buf.writeUInt8(network.player_disconnect, 0);
-            buf.writeUInt8(_cid, 1);
-            socketList[i].write(buf);
-        }
-        socketToPlayer.delete(socket.id); //remove player object
+            buf.writeUInt8(socket.id, 1);
+            sock.write(buf);
+        });
         console.log("Player disconnected")
-
-        for (var i = 0; i < socketList.length; i++) {
-            socketToPlayer[socket.id].socketPos = i;
-        }
     });
 });
 server.listen(port, function () { //activate server
     console.log("The Server has Started");
 });
 
-function sendPlayerObject(socketData, toSocket) {
+function sendPlayerObject(socketData, toSocket) { //send socketData's struct to toStruct
     buf.fill(0);
-    buf.writeUInt8(network.player_joined, 0);
-    buf.writeUInt8(socketData.cid, 1);
-    buf.writeUInt8(socketData.state, 2);
-    buf.write(socketData.name, 3);
+    buf.writeUInt8(network.state, 0);
+    buf.writeUInt8(socketData, 1);
+    buf.write(JSON.stringify(socketToPlayer[socketData]), 2);
     toSocket.write(buf);
 }
 
-function removeEmpty(_list) {
-    return _list.filter(function (el) {
-        return el != null;
+function updateState(socketData) { //send socketData's struct to all other players
+    socketToID.forEach(sock => {
+        if (element.id != socket.id) sendPlayerObject(socketData, element);
     });
+}
+
+function getGameTitle(sock1, sock2) { //compute game title - lower number id first
+    if (socket.id > newStruct.clicked) return "'" + socket.id + "'V'" + newStruct.clicked + "'";
+    return "'" + newStruct.clicked + "'V'" + socket.id + "'"; //apostrophe allows for an id to be searched for when removing a player from a game
+}
+
+function readBufString(str, ind) { //remove gamemaker packet headers from strings
+    return str.toString("utf-8", ind).replace(/\0/g, '').replace("\u0005", "");
 }
