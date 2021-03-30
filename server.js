@@ -6,7 +6,8 @@ const network = Object.freeze(
         "player_disconnect": 3,
         "state": 4,
         "move": 5,
-        "game_start": 6
+        "game_start": 6,
+        "game_spectate": 7
     });
 
 const states = Object.freeze(
@@ -162,6 +163,28 @@ server.on("connection", function (socket)//player connects
                 }
 
                 break;
+            case network.game_spectate:
+                var _cid = data.readUInt8(1);
+                socketToPlayer[socket.id].state = states.spectating;
+                socketToPlayer[_cid].game.spectators.push(socket.id);
+                var _game=socketToPlayer[_cid].game;
+                buf.fill(0);
+                buf.writeUInt8(network.game_spectating, 0);
+                buf.writeUInt8(_game.p1, 1);
+                buf.writeUInt8(_game.p2, 2);
+                buf.writeUInt8(_game.p1Score, 3);
+                buf.writeUInt8(_game.p2Score, 4);
+                socket.write(buf);
+
+                for (var i = 0; i < socketList.length; i++) {
+                    if (socketList[i].id != _players[1 - _whichPlayer] && socketList[i].id != _players[_whichPlayer]) {
+                        buf.fill(0);
+                        buf.writeUInt8(network.state, 0);
+                        buf.writeUInt8(states.spectating, 1);
+                        socketList[i].write(buf);
+                    }
+                }
+                break;
 
             case network.move:
                 var _x = data.readInt16LE(1);
@@ -180,7 +203,7 @@ server.on("connection", function (socket)//player connects
                 socketToPlayer[socket.id].hpState = _state;
 
                 var _struct = games[socketToPlayer[socket.id].game]; //get game struct
-                var _players = [];
+                var _players = _struct.spectators;
                 var _playerNum = (socket.id == _struct.p2);
                 if (_playerNum) _players.push(_struct.p1);
                 else _players.push(_struct.p2);
