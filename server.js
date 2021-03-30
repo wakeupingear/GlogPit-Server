@@ -2,10 +2,10 @@ const network = Object.freeze(
     {
         "send0": 0,
         "player_connect": 1,
-        "player_joined": 2,
-        "player_disconnect": 3,
-        "state": 4,
-        "move": 5,
+        "player_disconnect": 2,
+        "state": 3,
+        "move": 4,
+        "game_start": 5
     });
 
 const states = Object.freeze(
@@ -37,6 +37,7 @@ server.on("connection", function (socket)//player connects
     buf.fill(0)
     buf.writeUInt8(network.player_connect, 0); //send a connect packet with this id
     buf.writeUInt8(ids, 1);
+    buf.write(JSON.stringify(socketToPlayer),2);
     socket.write(buf);
     ids = (ids + 1) % 256; //iterate ids (1 byte constraint)
 
@@ -47,7 +48,7 @@ server.on("connection", function (socket)//player connects
                 break;
 
             case network.player_connect: //player confirms connection
-                let _struct = readBufString(data, 1); //recieve player struckt
+                let _struct = readBufString(data, 1); //recieve player struct
                 socketToPlayer[socket.id] = _struct;
 
                 updateState(socket); //send struct to other clients
@@ -116,17 +117,18 @@ server.on("connection", function (socket)//player connects
                             for (let i = 0; i < _players.length; i++) { //send game_start to everyone involved
                                 buf.fill(0);
                                 buf.writeUInt8(network.game_start, 0);
-                                buf.writeUInt8(_players[1 - i], 1);
+                                buf.writeUInt8(_players[Math.max(1 - i,0)], 1);
                                 buf.writeUInt8(i, 2);
                                 buf.writeUInt8(games[gameTitle].p1Score, 3);
                                 buf.writeUInt8(games[gameTitle].p2Score, 4);
+                                buf.writeUInt8(_players[1], 5);
                                 socketToID[_players[i]].write(buf);
                             }
                         }
                         break;
                     case states.spectating: //watch a game
                         Object.entries(games).forEach(game => {
-                            if (game.indexOf("'" + newStruct.clicked + "'") > -1) { //determine the right game
+                            if (game.indexOf("'" + newStruct.clicked + "'") > -1||game.spectators.includes(newStruct.clicked)) { //determine the right game
                                 games[game].spectators.push(socket.id);
                                 buf.fill(0);
                                 buf.writeUInt8(network.game_start, 0); //send game_start to this player
