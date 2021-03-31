@@ -48,7 +48,7 @@ server.on("connection", function (socket)//player connects
                 break;
 
             case network.player_connect: //player confirms connection
-                let _structConnect = readBufString(data, 1); //recieve player struct
+                let _structConnect = JSON.parse(readBufString(data, 1)); //recieve player struct
                 socketToPlayer[socket.id] = _structConnect;
                 console.log(socketToPlayer);
 
