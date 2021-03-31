@@ -50,7 +50,6 @@ server.on("connection", function (socket)//player connects
             case network.player_connect: //player confirms connection
                 let _structConnect = JSON.parse(readBufString(data, 1)); //recieve player struct
                 socketToPlayer[socket.id] = _structConnect;
-                console.log(socketToPlayer);
 
                 updateState(socket.id); //send struct to other clients
                 console.log("PlayerName: " + _structConnect.name);
@@ -156,7 +155,6 @@ server.on("connection", function (socket)//player connects
                     default: break;
                 }
                 socketToPlayer[socket.id] = newStruct; //set the struct to the new one
-                console.log(socketToPlayer);
                 updateState(socket.id); //send updated struct to other players
                 break;
 
@@ -186,6 +184,7 @@ function sendPlayerObject(socketData, toSocket) { //send socketData's struct to 
     buf.writeUInt8(network.state, 0);
     buf.writeUInt8(socketData, 1);
     buf.write(JSON.stringify(socketToPlayer[socketData]), 2);
+    console.log(JSON.stringify(socketToPlayer[socketData]));
     toSocket.write(buf);
 }
 
