@@ -190,7 +190,7 @@ function sendPlayerObject(socketData, toSocket) { //send socketData's struct to 
 }
 
 function updateState(socketData) { //send socketData's struct to all other players
-    Objer.keys(socketToPlayer).forEach(sock => {
+    Object.keys(socketToPlayer).forEach(sock => {
         if (sock.id != socket.id) sendPlayerObject(socketData, sock);
     });
 }
