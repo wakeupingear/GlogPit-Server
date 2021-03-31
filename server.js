@@ -121,11 +121,11 @@ server.on("connection", function (socket)//player connects
                                 for (let i = 0; i < _players.length; i++) { //send game_start to everyone involved
                                     buf.fill(0);
                                     buf.writeUInt8(network.game_start, 0);
-                                    buf.writeUInt8(_players[Math.max(1 - i, 0)], 1);
+                                    buf.writeUInt8(parseInt(parseInt(_players[Math.max(1 - i, 0)])), 1);
                                     buf.writeUInt8(i, 2);
                                     buf.writeUInt8(games[gameTitle].p1Score, 3);
                                     buf.writeUInt8(games[gameTitle].p2Score, 4);
-                                    buf.writeUInt8(_players[1], 5);
+                                    buf.writeUInt8(parseInt(_players[1]), 5);
                                     socketToID[_players[i]].write(buf);
                                 }
                                 break;
@@ -175,7 +175,7 @@ server.on("connection", function (socket)//player connects
         Object.values(socketToID).forEach(sock => { //send disconnect to other players
             buf.fill(0);
             buf.writeUInt8(network.player_disconnect, 0);
-            buf.writeUInt8(socket.id, 1);
+            buf.writeUInt8(parseInt(socket.id), 1);
             sock.write(buf);
         });
         console.log("Player disconnected")
