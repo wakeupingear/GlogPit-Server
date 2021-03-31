@@ -37,7 +37,7 @@ server.on("connection", function (socket)//player connects
     buf.fill(0)
     buf.writeUInt8(network.player_connect, 0); //send a connect packet with this id
     buf.writeUInt8(ids, 1);
-    buf.write(JSON.stringify(socketToPlayer),2);
+    buf.write(JSON.stringify(socketToPlayer), 2);
     socket.write(buf);
     ids = (ids + 1) % 256; //iterate ids (1 byte constraint)
 
@@ -87,7 +87,7 @@ server.on("connection", function (socket)//player connects
 
             case network.state: //updated state
                 const oldStruct = socketToPlayer[socket.id]; //save copy of previous struct
-                let newStruct = JSON.parse(readBufString(data.read(1))); //read new struct
+                let newStruct = JSON.parse(readBufString(data, 1)); //read new struct
                 switch (newStruct.clientState) {
                     case states.offering: //game offers
                     case states.rematchOffering:
@@ -118,7 +118,7 @@ server.on("connection", function (socket)//player connects
                             for (let i = 0; i < _players.length; i++) { //send game_start to everyone involved
                                 buf.fill(0);
                                 buf.writeUInt8(network.game_start, 0);
-                                buf.writeUInt8(_players[Math.max(1 - i,0)], 1);
+                                buf.writeUInt8(_players[Math.max(1 - i, 0)], 1);
                                 buf.writeUInt8(i, 2);
                                 buf.writeUInt8(games[gameTitle].p1Score, 3);
                                 buf.writeUInt8(games[gameTitle].p2Score, 4);
@@ -129,7 +129,7 @@ server.on("connection", function (socket)//player connects
                         break;
                     case states.spectating: //watch a game
                         Object.entries(games).forEach(game => {
-                            if (game.indexOf("'" + newStruct.clicked + "'") > -1||game.spectators.includes(newStruct.clicked)) { //determine the right game
+                            if (game.indexOf("'" + newStruct.clicked + "'") > -1 || game.spectators.includes(newStruct.clicked)) { //determine the right game
                                 games[game].spectators.push(socket.id);
                                 buf.fill(0);
                                 buf.writeUInt8(network.game_start, 0); //send game_start to this player
@@ -145,7 +145,7 @@ server.on("connection", function (socket)//player connects
                     case states.idle: //return to game select screen
                         Object.entries(games).forEach(game => {
                             if (game.indexOf("'" + socket.id + "'") > -1) { //remove game if you were playing in one
-                                delete games[game]; 
+                                delete games[game];
                                 //add code to close game for spectators/other player
                             }
                             else if (game.spectators.includes(socket.id)) { //remove from spectator list
@@ -196,7 +196,7 @@ function updateState(socketData) { //send socketData's struct to all other playe
 }
 
 function getGameTitle(sock1, sock2) { //compute game title - lower number id first
-    if (sock1 > sock2) return "'" + sock1+ "'V'" + sock2 + "'";
+    if (sock1 > sock2) return "'" + sock1 + "'V'" + sock2 + "'";
     return "'" + sock2 + "'V'" + sock1 + "'"; //apostrophe allows for an id to be searched for when removing a player from a game
 }
 
