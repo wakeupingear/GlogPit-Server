@@ -52,7 +52,7 @@ server.on("connection", function (socket)//player connects
                 socketToPlayer[socket.id] = _structConnect;
                 console.log(socketToPlayer);
 
-                updateState(socket); //send struct to other clients
+                updateState(socket.id); //send struct to other clients
                 console.log("PlayerName: " + _structConnect.name);
                 break;
 
@@ -157,7 +157,7 @@ server.on("connection", function (socket)//player connects
                 }
                 socketToPlayer[socket.id] = newStruct; //set the struct to the new one
                 console.log(socketToPlayer);
-                updateState(socket); //send updated struct to other players
+                updateState(socket.id); //send updated struct to other players
                 break;
 
             default: break;
@@ -196,8 +196,8 @@ function updateState(socketData) { //send socketData's struct to all other playe
 }
 
 function getGameTitle(sock1, sock2) { //compute game title - lower number id first
-    if (socket.id > newStruct.clicked) return "'" + socket.id + "'V'" + newStruct.clicked + "'";
-    return "'" + newStruct.clicked + "'V'" + socket.id + "'"; //apostrophe allows for an id to be searched for when removing a player from a game
+    if (sock1 > sock2) return "'" + sock1+ "'V'" + sock2 + "'";
+    return "'" + sock2 + "'V'" + sock1 + "'"; //apostrophe allows for an id to be searched for when removing a player from a game
 }
 
 function readBufString(str, ind) { //remove gamemaker packet headers from strings
