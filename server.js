@@ -32,7 +32,7 @@ let games = {};
 server.on("connection", function (socket)//player connects
 {
     console.log("New player");
-    socket.id = ids; //set this player's id
+    socket.id = ids.toString(); //set this player's id
     socketToID[socket.id] = socket; //add an entry mapping id to socket (bad name I know)
     buf.fill(0)
     buf.writeUInt8(network.player_connect, 0); //send a connect packet with this id
