@@ -90,45 +90,49 @@ server.on("connection", function (socket)//player connects
                 switch (newStruct.clientState) {
                     case states.offering: //game offers
                     case states.rematchOffering:
-                        const other = socketToPlayer[newStruct.clicked]; //get the one that you are offering to
-                        if (other.clientState == newStruct.clientState && other.clicked == socket.id) { //both are offering to each other
-                            const gameTitle = getGameTitle(socket.id, newStruct.clicked); //calculate title of game
-                            console.log("Game starting: " + gameTitle);
-                            if (games[gameTitle] == undefined) { //brand new game
-                                games[gameTitle] = {
-                                    "p1": newStruct.clicked,
-                                    "p2": socket.id,
-                                    "p1Score": 0,
-                                    "p2Score": 0,
-                                    "spectators": []
+                        const otherID=newStruct.clicked[newStruct.clicked.length-1];
+                        const other = socketToPlayer[otherID]; //get the one that you are offering to
+                        for (let i = 0; i < other.clicked.length; i++) {
+                            if (other.clientState == newStruct.clientState && other.clicked[i] == socket.id) { //both are offering to each other
+                                const gameTitle = getGameTitle(socket.id, otherID); //calculate title of game
+                                console.log("Game starting: " + gameTitle);
+                                if (games[gameTitle] == undefined) { //brand new game
+                                    games[gameTitle] = {
+                                        "p1": otherID,
+                                        "p2": socket.id,
+                                        "p1Score": 0,
+                                        "p2Score": 0,
+                                        "spectators": []
+                                    }
                                 }
-                            }
-                            else { //game already exists
-                                if (oldStruct.wins < newStruct.wins) { //this player won the last game
-                                    if (games[gameTitle].p1 == socket.id) games[gameTitle].p1Score++;
-                                    else games[gameTitle].p2Score++;
+                                else { //game already exists
+                                    if (oldStruct.wins < newStruct.wins) { //this player won the last game
+                                        if (games[gameTitle].p1 == socket.id) games[gameTitle].p1Score++;
+                                        else games[gameTitle].p2Score++;
+                                    }
+                                    else { //the other player won the last game
+                                        if (games[gameTitle].p1 == socket.id) games[gameTitle].p2Score++;
+                                        else games[gameTitle].p1Score++;
+                                    }
                                 }
-                                else { //the other player won the last game
-                                    if (games[gameTitle].p1 == newStruct.clicked) games[gameTitle].p1Score++;
-                                    else games[gameTitle].p2Score++;
+                                const _players = [games[gameTitle].p1, games[gameTitle].p2].concat(games[gameTitle].spectators); //combine spectators and players
+                                for (let i = 0; i < _players.length; i++) { //send game_start to everyone involved
+                                    buf.fill(0);
+                                    buf.writeUInt8(network.game_start, 0);
+                                    buf.writeUInt8(_players[Math.max(1 - i, 0)], 1);
+                                    buf.writeUInt8(i, 2);
+                                    buf.writeUInt8(games[gameTitle].p1Score, 3);
+                                    buf.writeUInt8(games[gameTitle].p2Score, 4);
+                                    buf.writeUInt8(_players[1], 5);
+                                    socketToID[_players[i]].write(buf);
                                 }
-                            }
-                            const _players = [games[gameTitle].p1, games[gameTitle].p2].concat(games[gameTitle].spectators); //combine spectators and players
-                            for (let i = 0; i < _players.length; i++) { //send game_start to everyone involved
-                                buf.fill(0);
-                                buf.writeUInt8(network.game_start, 0);
-                                buf.writeUInt8(_players[Math.max(1 - i, 0)], 1);
-                                buf.writeUInt8(i, 2);
-                                buf.writeUInt8(games[gameTitle].p1Score, 3);
-                                buf.writeUInt8(games[gameTitle].p2Score, 4);
-                                buf.writeUInt8(_players[1], 5);
-                                socketToID[_players[i]].write(buf);
+                                break;
                             }
                         }
                         break;
                     case states.spectating: //watch a game
                         Object.entries(games).forEach(game => {
-                            if (game.indexOf("'" + newStruct.clicked + "'") > -1 || game.spectators.includes(newStruct.clicked)) { //determine the right game
+                            if (game.indexOf("'" + newStruct.clicked[0] + "'") > -1 || game.spectators.includes(newStruct.clicked[0])) { //determine the right game
                                 games[game].spectators.push(socket.id);
                                 buf.fill(0);
                                 buf.writeUInt8(network.game_start, 0); //send game_start to this player
