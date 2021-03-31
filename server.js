@@ -186,11 +186,11 @@ function sendPlayerObject(socketData, toSocket) { //send socketData's struct to 
     buf.writeUInt8(network.state, 0);
     buf.writeUInt8(socketData, 1);
     buf.write(JSON.stringify(socketToPlayer[socketData]), 2);
-    socketToID[toSocket].write(buf);
+    toSocket.write(buf);
 }
 
 function updateState(socketData) { //send socketData's struct to all other players
-    Object.keys(socketToPlayer).forEach(sock => {
+    Object.keys(socketToID).forEach(sock => {
         if (sock.id != socketData) sendPlayerObject(socketData, sock);
     });
 }
