@@ -168,7 +168,7 @@ server.on("connection", function (socket)//player connects
         delete socketToPlayer[socket.id];
         delete socketToID[socket.id];
 
-        socektToID.forEach(sock => { //send disconnect to other players
+        Object.values(socketToID).forEach(sock => { //send disconnect to other players
             buf.fill(0);
             buf.writeUInt8(network.player_disconnect, 0);
             buf.writeUInt8(socket.id, 1);
