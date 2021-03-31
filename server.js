@@ -182,8 +182,7 @@ server.listen(port, function () { //activate server
 function sendPlayerObject(socketData, toSocket) { //send socketData's struct to toStruct
     buf.fill(0);
     buf.writeUInt8(network.state, 0);
-    buf.writeUInt8(socketData, 1);
-    buf.write(JSON.stringify(socketToPlayer[socketData]), 2);
+    buf.write(JSON.stringify(socketToPlayer[socketData]), 1);
     console.log(JSON.stringify(socketToPlayer[socketData]));
     toSocket.write(buf);
 }
