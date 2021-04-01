@@ -131,7 +131,7 @@ server.on("connection", function (socket)//player connects
                         }
                         break;
                     case states.spectating: //watch a game
-                        Object.entries(games).forEach(game => {
+                        Object.values(games).forEach(game => {
                             if (game.indexOf("'" + newStruct.clicked[0] + "'") > -1 || game.spectators.includes(newStruct.clicked[0])) { //determine the right game
                                 games[game].spectators.push(socket.id);
                                 buf.fill(0);
@@ -146,7 +146,7 @@ server.on("connection", function (socket)//player connects
                         });
                         break;
                     case states.idle: //return to game select screen
-                        Object.entries(games).forEach(game => {
+                        Object.values(games).forEach(game => {
                             if (game.indexOf("'" + socket.id + "'") > -1) { //remove game if you were playing in one
                                 delete games[game];
                                 //add code to close game for spectators/other player
