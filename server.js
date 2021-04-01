@@ -87,13 +87,11 @@ server.on("connection", function (socket)//player connects
             case network.state: //updated state
                 const oldStruct = socketToPlayer[socket.id]; //save copy of previous struct
                 let newStruct = JSON.parse(readBufString(data, 1)); //read new struct
-                switch (newStruct.clientState) {
+                switch (newStruct.state) {
                     case states.offering: //game offers
                     case states.rematchOffering:
                         const otherID=newStruct.clicked[newStruct.clicked.length-1];
                         const other = socketToPlayer[otherID]; //get the one that you are offering to
-                        console.log(socket.id);
-                        console.log(other.clicked.length);
                         for (let i = 0; i < other.clicked.length; i++) {
                             if (other.clicked[i] == socket.id) { //both are offering to each other
                                 const gameTitle = getGameTitle(socket.id, otherID); //calculate title of game
