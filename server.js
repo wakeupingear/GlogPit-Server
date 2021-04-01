@@ -5,7 +5,8 @@ const network = Object.freeze(
         "player_disconnect": 2,
         "state": 3,
         "move": 4,
-        "game_start": 5
+        "game_start": 5,
+        "leave": 6
     });
 
 const states = Object.freeze(
@@ -65,22 +66,25 @@ server.on("connection", function (socket)//player connects
                 let _attack = data.readUInt8(9);
 
                 let _struct = games[socketToPlayer[socket.id].game]; //get game struct
-                let _players = _struct.spectators; //get spectators
-                let _playerNum = (socket.id == _struct.p2); //figure out which player this one isn't
-                if (_playerNum) _players.push(_struct.p1);
-                else _players.push(_struct.p2);
-                for (let i = 0; i < _players.length; i++) { //loop through spectators and players to send movement
-                    buf.fill(0);
-                    buf.writeUInt8(network.move, 0);
-                    buf.writeUInt8(_playerNum, 1); //player 1 or 2
-                    buf.writeInt16LE(_x, 2);
-                    buf.writeInt16LE(_y, 4);
-                    buf.writeUInt8(_spriteIndex, 6);
-                    buf.writeUInt8(_imageIndex, 7);
-                    buf.writeInt8(_imageXs, 8);
-                    buf.writeUInt8(_state, 9);
-                    buf.writeUInt8(_attack, 10);
-                    socketToID[_players[i]].write(buf);
+                if (_struct != undefined) {
+                    let _players = []; //get spectators
+                    let _playerNum = (socket.id == _struct.p2); //figure out which player this one isn't
+                    if (_playerNum) _players.push(_struct.p1);
+                    else _players.push(_struct.p2);
+                    _players = _players.concat(_struct.spectators);
+                    for (let i = 0; i < _players.length; i++) { //loop through spectators and players to send movement
+                        buf.fill(0);
+                        buf.writeUInt8(network.move, 0);
+                        buf.writeUInt8(_playerNum, 1); //player 1 or 2
+                        buf.writeInt16LE(_x, 2);
+                        buf.writeInt16LE(_y, 4);
+                        buf.writeUInt8(_spriteIndex, 6);
+                        buf.writeUInt8(_imageIndex, 7);
+                        buf.writeInt8(_imageXs, 8);
+                        buf.writeUInt8(_state, 9);
+                        buf.writeUInt8(_attack, 10);
+                        socketToID[_players[i]].write(buf);
+                    }
                 }
                 break;
 
@@ -90,7 +94,7 @@ server.on("connection", function (socket)//player connects
                 switch (newStruct.state) {
                     case states.offering: //game offers
                     case states.rematchOffering:
-                        const otherID=newStruct.clicked[newStruct.clicked.length-1];
+                        const otherID = newStruct.clicked[newStruct.clicked.length - 1];
                         const other = socketToPlayer[otherID]; //get the one that you are offering to
                         for (let i = 0; i < other.clicked.length; i++) {
                             if (other.clicked[i] == socket.id) { //both are offering to each other
@@ -139,6 +143,7 @@ server.on("connection", function (socket)//player connects
                                 buf.writeUInt8(2, 1); //
                                 buf.writeUInt8(1 + games[game].spectators.length, 2); //position in spectator queue
                                 buf.writeUInt8(games[game].p1Score, 3);
+                                socket.write(buf);
 
                                 //add code to send this spectator to the players
                             }
@@ -147,8 +152,18 @@ server.on("connection", function (socket)//player connects
                     case states.idle: //return to game select screen
                         Object.keys(games).forEach(game => {
                             if (game.indexOf("'" + socket.id + "'") > -1) { //remove game if you were playing in one
-                                delete games[game];
                                 //add code to close game for spectators/other player
+                                if (games[game].p1 == socket.id) var _players = [games[game].p2];
+                                else var _players = [games[game].p1];
+                                _players = _players.concat(games[game].spectators);
+                                console.log(_players)
+                                _players.forEach(sockID => {
+                                    buf.fill(0);
+                                    buf.writeUInt8(network.leave, 0);
+                                    socketToID[sockID].write(buf);
+                                });
+
+                                delete games[game];
                             }
                             else if (games[game].spectators.includes(socket.id)) { //remove from spectator list
                                 games[game].spectators.splice(games[game].spectators.indexOf(socket.id), 1);
@@ -202,5 +217,5 @@ function getGameTitle(sock1, sock2) { //compute game title - lower number id fir
 }
 
 function readBufString(str, ind) { //remove gamemaker packet headers from strings
-    return str.toString("utf-8", ind).replace(/\0/g, '').replace("\u0005", "").split("}")[0]+"}";
+    return str.toString("utf-8", ind).replace(/\0/g, '').replace("\u0005", "").split("}")[0] + "}";
 }
