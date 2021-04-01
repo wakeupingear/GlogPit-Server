@@ -131,8 +131,8 @@ server.on("connection", function (socket)//player connects
                         }
                         break;
                     case states.spectating: //watch a game
-                        Object.values(games).forEach(game => {
-                            if (game.indexOf("'" + newStruct.clicked[0] + "'") > -1 || game.spectators.includes(newStruct.clicked[0])) { //determine the right game
+                        Object.keys(games).forEach(game => {
+                            if (game.indexOf("'" + newStruct.clicked[0] + "'") > -1 || games[game].spectators.includes(newStruct.clicked[0])) { //determine the right game
                                 games[game].spectators.push(socket.id);
                                 buf.fill(0);
                                 buf.writeUInt8(network.game_start, 0); //send game_start to this player
