@@ -202,5 +202,5 @@ function getGameTitle(sock1, sock2) { //compute game title - lower number id fir
 }
 
 function readBufString(str, ind) { //remove gamemaker packet headers from strings
-    return str.toString("utf-8", ind).replace(/\0/g, '').replace("\u0005", "");
+    return str.toString("utf-8", ind).replace(/\0/g, '').replace("\u0005", "").split("}")[0]+"}";
 }
