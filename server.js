@@ -137,22 +137,21 @@ server.on("connection", function (socket)//player connects
                                 buf.fill(0);
                                 buf.writeUInt8(network.game_start, 0); //send game_start to this player
                                 buf.writeUInt8(2, 1); //
-                                buf.writeUInt8(1 + spectators.length, 2); //position in spectator queue
+                                buf.writeUInt8(1 + games[game].spectators.length, 2); //position in spectator queue
                                 buf.writeUInt8(games[game].p1Score, 3);
-                                buf.writeUInt8(games[game].p2Score, 4);
 
                                 //add code to send this spectator to the players
                             }
                         });
                         break;
                     case states.idle: //return to game select screen
-                        Object.values(games).forEach(game => {
+                        Object.keys(games).forEach(game => {
                             if (game.indexOf("'" + socket.id + "'") > -1) { //remove game if you were playing in one
                                 delete games[game];
                                 //add code to close game for spectators/other player
                             }
-                            else if (game.spectators.includes(socket.id)) { //remove from spectator list
-                                game.spectators.splice(game.spectators.indexOf(socket.id), 1);
+                            else if (games[game].spectators.includes(socket.id)) { //remove from spectator list
+                                games[game].spectators.splice(games[game].spectators.indexOf(socket.id), 1);
                             }
                         });
                         break;
