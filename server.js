@@ -20,7 +20,7 @@ const states = Object.freeze(
 
 //npm
 const net = require("net");
-const buf = Buffer.alloc(4096);
+const buf = Buffer.alloc(2048);
 
 let port = 34579;
 let server = net.createServer();
@@ -83,7 +83,15 @@ server.on("connection", function (socket)//player connects
                         buf.writeInt8(_imageXs, 8);
                         buf.writeUInt8(_state, 9);
                         buf.writeUInt8(_attack, 10);
-                        socketToID[_players[i]].write(buf);
+                        if (socketToID[_players[i]] != undefined) socketToID[_players[i]].write(buf);
+                        else {
+                            _players.push(socket.id);
+                            _players.forEach(sockID => {
+                                buf.fill(0);
+                                buf.writeUInt8(network.leave, 0);
+                                if (sockID in socketToID) socketToID[sockID].write(buf);
+                            });
+                        }
                     }
                 }
                 break;
@@ -123,11 +131,13 @@ server.on("connection", function (socket)//player connects
                                 for (let i = 0; i < _players.length; i++) { //send game_start to everyone involved
                                     buf.fill(0);
                                     buf.writeUInt8(network.game_start, 0);
-                                    buf.writeUInt8(parseInt(parseInt(_players[Math.max(1 - i, 0)])), 1);
+                                    if (i > 1) buf.writeUInt8(games[gameTitle].p1, 1);
+                                    else if (_players[i] == games[gameTitle].p2) buf.writeUInt8(games[gameTitle].p1, 1);
+                                    else buf.writeUInt8(games[gameTitle].p2, 1);
                                     buf.writeUInt8(i, 2);
                                     buf.writeUInt8(games[gameTitle].p1Score, 3);
                                     buf.writeUInt8(games[gameTitle].p2Score, 4);
-                                    buf.writeUInt8(parseInt(_players[1]), 5);
+                                    buf.writeUInt8(games[gameTitle].p2, 5);
                                     socketToID[_players[i]].write(buf);
                                 }
                                 break;
@@ -139,10 +149,12 @@ server.on("connection", function (socket)//player connects
                             if (game.indexOf("'" + newStruct.clicked[0] + "'") > -1 || games[game].spectators.includes(newStruct.clicked[0])) { //determine the right game
                                 games[game].spectators.push(socket.id);
                                 buf.fill(0);
-                                buf.writeUInt8(network.game_start, 0); //send game_start to this player
-                                buf.writeUInt8(2, 1); //
-                                buf.writeUInt8(1 + games[game].spectators.length, 2); //position in spectator queue
+                                buf.writeUInt8(network.game_start, 0);
+                                buf.writeUInt8(games[game].p1, 1);
+                                buf.writeUInt8(1 + games[game].spectators.length, 2);
                                 buf.writeUInt8(games[game].p1Score, 3);
+                                buf.writeUInt8(games[game].p2Score, 4);
+                                buf.writeUInt8(games[game].p2, 5);
                                 socket.write(buf);
 
                                 //add code to send this spectator to the players
@@ -160,7 +172,7 @@ server.on("connection", function (socket)//player connects
                                 _players.forEach(sockID => {
                                     buf.fill(0);
                                     buf.writeUInt8(network.leave, 0);
-                                    socketToID[sockID].write(buf);
+                                    if (sockID in socketToID) socketToID[sockID].write(buf);
                                 });
 
                                 delete games[game];
@@ -212,7 +224,7 @@ function updateState(socketData) { //send socketData's struct to all other playe
 }
 
 function getGameTitle(sock1, sock2) { //compute game title - lower number id first
-    if (sock1 > sock2) return "'" + sock1 + "'V'" + sock2 + "'";
+    //if (sock1 > sock2) return "'" + sock1 + "'V'" + sock2 + "'";
     return "'" + sock2 + "'V'" + sock1 + "'"; //apostrophe allows for an id to be searched for when removing a player from a game
 }
 
