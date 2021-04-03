@@ -85,12 +85,18 @@ server.on("connection", function (socket)//player connects
                         buf.writeUInt8(_attack, 10);
                         if (socketToID[_players[i]] != undefined) socketToID[_players[i]].write(buf);
                         else {
+                            let _spectInd=_struct.spectators.indexOf(_players[i]);
+                            if (_spectInd>-1){
+                                games[socketToPlayer[socket.id].game].spectators.splice(_spectInd,1);
+                            }
+                            else {
                             _players.push(socket.id);
                             _players.forEach(sockID => {
                                 buf.fill(0);
                                 buf.writeUInt8(network.leave, 0);
                                 if (sockID in socketToID) socketToID[sockID].write(buf);
                             });
+                            }
                         }
                     }
                 }
