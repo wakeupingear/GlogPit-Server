@@ -85,20 +85,31 @@ server.on("connection", function (socket)//player connects
                         buf.writeUInt8(_attack, 10);
                         if (socketToID[_players[i]] != undefined) socketToID[_players[i]].write(buf);
                         else {
-                            let _spectInd=_struct.spectators.indexOf(_players[i]);
-                            if (_spectInd>-1){
-                                games[socketToPlayer[socket.id].game].spectators.splice(_spectInd,1);
+                            let _spectInd = _struct.spectators.indexOf(_players[i]);
+                            if (_spectInd > -1) {
+                                games[socketToPlayer[socket.id].game].spectators.splice(_spectInd, 1);
                             }
                             else {
-                            _players.push(socket.id);
-                            _players.forEach(sockID => {
-                                buf.fill(0);
-                                buf.writeUInt8(network.leave, 0);
-                                if (sockID in socketToID) socketToID[sockID].write(buf);
-                            });
+                                _players.push(socket.id);
+                                _players.forEach(sockID => {
+                                    buf.fill(0);
+                                    buf.writeUInt8(network.leave, 0);
+                                    if (sockID in socketToID) socketToID[sockID].write(buf);
+                                });
                             }
                         }
                     }
+                    buf.fill(0);
+                    buf.writeUInt8(network.move, 0);
+                    buf.writeUInt8(2, 1); //player 1 or 2
+                    buf.writeInt16LE(_x, 2);
+                    buf.writeInt16LE(_y, 4);
+                    buf.writeUInt8(_spriteIndex, 6);
+                    buf.writeUInt8(_imageIndex, 7);
+                    buf.writeInt8(_imageXs, 8);
+                    buf.writeUInt8(_state, 9);
+                    buf.writeUInt8(_attack, 10);
+                    socket.write(buf);
                 }
                 break;
 
@@ -112,7 +123,8 @@ server.on("connection", function (socket)//player connects
                         const other = socketToPlayer[otherID]; //get the one that you are offering to
                         for (let i = 0; i < other.clicked.length; i++) {
                             if (other.clicked[i] == socket.id) { //both are offering to each other
-                                const gameTitle = getGameTitle(socket.id, otherID); //calculate title of game
+                                let gameTitle = getGameTitle(socket.id, otherID); //calculate title of game
+                                if (getGameTitle(otherID, socket.id) in games) gameTitle = getGameTitle(otherID, socket.id);
                                 console.log("Game starting: " + gameTitle);
                                 if (games[gameTitle] == undefined) { //brand new game
                                     games[gameTitle] = {
